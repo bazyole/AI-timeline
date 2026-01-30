@@ -6,6 +6,7 @@
     <title>LLM Coding Benchmark</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;600;700&family=IBM+Plex+Mono:wght@400;500&family=Playfair+Display:ital,wght@0,600;1,600&display=swap');
         
@@ -92,6 +93,56 @@
             padding: 1.5rem;
             background: rgba(255,255,255,0.015);
             border: 1px solid var(--border);
+        }
+
+        .controls-block {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            width: 100%;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            align-items: center;
+        }
+
+        .control-label {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+        }
+
+        .control-input {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.7rem;
+            padding: 0.4rem 0.6rem;
+        }
+
+        .control-btn {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.68rem;
+            padding: 0.5rem 0.9rem;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            transition: all 0.2s ease;
+        }
+
+        .control-btn:hover {
+            border-color: var(--text-primary);
+            color: var(--text-primary);
         }
         
         .filter-btn {
@@ -271,14 +322,39 @@
     
     <div class="container">
         <div class="controls">
-            <button class="filter-btn active" data-filter="all">Tous</button>
-            <button class="filter-btn" data-filter="openai">OpenAI</button>
-            <button class="filter-btn" data-filter="anthropic">Anthropic</button>
-            <button class="filter-btn" data-filter="google">Google</button>
-            <button class="filter-btn" data-filter="alibaba">Alibaba</button>
-            <button class="filter-btn" data-filter="deepseek">DeepSeek</button>
-            <button class="filter-btn" data-filter="meta">Meta</button>
-            <button class="filter-btn" data-filter="other">Autres</button>
+            <div class="controls-block">
+                <div class="control-group">
+                    <span class="control-label">Filtres</span>
+                    <button class="filter-btn active" data-filter="all">Tous</button>
+                    <button class="filter-btn" data-filter="openai">OpenAI</button>
+                    <button class="filter-btn" data-filter="anthropic">Anthropic</button>
+                    <button class="filter-btn" data-filter="google">Google</button>
+                    <button class="filter-btn" data-filter="alibaba">Alibaba</button>
+                    <button class="filter-btn" data-filter="deepseek">DeepSeek</button>
+                    <button class="filter-btn" data-filter="meta">Meta</button>
+                    <button class="filter-btn" data-filter="other">Autres</button>
+                </div>
+                <div class="control-group">
+                    <span class="control-label">Zoom</span>
+                    <button class="control-btn" id="zoomIn">Zoom +</button>
+                    <button class="control-btn" id="zoomOut">Zoom -</button>
+                    <button class="control-btn" id="resetZoom">Réinitialiser</button>
+                </div>
+            </div>
+            <div class="controls-block">
+                <div class="control-group">
+                    <span class="control-label">Axe X</span>
+                    <input class="control-input" type="date" id="xMin" aria-label="X minimum">
+                    <input class="control-input" type="date" id="xMax" aria-label="X maximum">
+                    <button class="control-btn" id="applyX">Appliquer</button>
+                </div>
+                <div class="control-group">
+                    <span class="control-label">Axe Y</span>
+                    <input class="control-input" type="number" id="yMin" placeholder="min">
+                    <input class="control-input" type="number" id="yMax" placeholder="max">
+                    <button class="control-btn" id="applyY">Appliquer</button>
+                </div>
+            </div>
         </div>
         
         <div class="chart-container">
@@ -419,6 +495,16 @@
         let chart;
         let activeFilter = "all";
         let hiddenVendors = new Set();
+        const defaultYMin = 600;
+        const defaultYMax = 1500;
+        const dateExtent = rawData.reduce((acc, item) => {
+            const date = new Date(item.date);
+            if (!acc.min || date < acc.min) acc.min = date;
+            if (!acc.max || date > acc.max) acc.max = date;
+            return acc;
+        }, { min: null, max: null });
+        const defaultXMin = dateExtent.min;
+        const defaultXMax = dateExtent.max;
 
         function getFilteredData() {
             let data = rawData;
@@ -598,6 +684,43 @@
             updateStats(data);
         }
 
+        function setAxisInputs() {
+            const xMinInput = document.getElementById('xMin');
+            const xMaxInput = document.getElementById('xMax');
+            const yMinInput = document.getElementById('yMin');
+            const yMaxInput = document.getElementById('yMax');
+
+            xMinInput.value = defaultXMin.toISOString().slice(0, 10);
+            xMaxInput.value = defaultXMax.toISOString().slice(0, 10);
+            yMinInput.value = defaultYMin;
+            yMaxInput.value = defaultYMax;
+        }
+
+        function applyAxisScale(axis) {
+            if (!chart) return;
+            if (axis === 'x') {
+                const minValue = document.getElementById('xMin').value;
+                const maxValue = document.getElementById('xMax').value;
+                chart.options.scales.x.min = minValue ? new Date(minValue) : undefined;
+                chart.options.scales.x.max = maxValue ? new Date(maxValue) : undefined;
+            }
+            if (axis === 'y') {
+                const minValue = document.getElementById('yMin').value;
+                const maxValue = document.getElementById('yMax').value;
+                chart.options.scales.y.min = minValue ? Number(minValue) : undefined;
+                chart.options.scales.y.max = maxValue ? Number(maxValue) : undefined;
+            }
+            chart.update('none');
+        }
+
+        function resetAxes() {
+            chart.options.scales.x.min = defaultXMin;
+            chart.options.scales.x.max = defaultXMax;
+            chart.options.scales.y.min = defaultYMin;
+            chart.options.scales.y.max = defaultYMax;
+            setAxisInputs();
+        }
+
         function initChart() {
             const ctx = document.getElementById('mainChart').getContext('2d');
             const data = getFilteredData();
@@ -614,6 +737,24 @@
                     },
                     plugins: {
                         legend: { display: false },
+                        zoom: {
+                            pan: {
+                                enabled: true,
+                                mode: 'xy'
+                            },
+                            zoom: {
+                                wheel: {
+                                    enabled: true
+                                },
+                                pinch: {
+                                    enabled: true
+                                },
+                                drag: {
+                                    enabled: true
+                                },
+                                mode: 'xy'
+                            }
+                        },
                         tooltip: {
                             backgroundColor: 'rgba(20, 20, 20, 0.95)',
                             titleColor: '#fff',
@@ -647,6 +788,8 @@
                     scales: {
                         x: {
                             type: 'time',
+                            min: defaultXMin,
+                            max: defaultXMax,
                             time: {
                                 unit: 'month',
                                 displayFormats: { month: 'MMM yy' }
@@ -667,8 +810,8 @@
                             }
                         },
                         y: {
-                            min: 600,
-                            max: 1500,
+                            min: defaultYMin,
+                            max: defaultYMax,
                             grid: {
                                 color: '#2a2a2a',
                                 drawBorder: false
@@ -694,6 +837,7 @@
             
             updateStats(data);
             buildLegend();
+            setAxisInputs();
         }
 
         document.querySelectorAll('.filter-btn').forEach(btn => {
@@ -703,6 +847,16 @@
                 activeFilter = btn.dataset.filter;
                 updateChart();
             });
+        });
+
+        document.getElementById('applyX').addEventListener('click', () => applyAxisScale('x'));
+        document.getElementById('applyY').addEventListener('click', () => applyAxisScale('y'));
+        document.getElementById('zoomIn').addEventListener('click', () => chart.zoom(1.2));
+        document.getElementById('zoomOut').addEventListener('click', () => chart.zoom(0.8));
+        document.getElementById('resetZoom').addEventListener('click', () => {
+            chart.resetZoom();
+            resetAxes();
+            chart.update('none');
         });
 
         initChart();
