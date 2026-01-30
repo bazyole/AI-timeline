@@ -429,9 +429,59 @@
         }
 
         const iconCache = new Map();
+        const logoCache = new Map();
 
-        function createModelIcon(model, color) {
-            const cacheKey = `${model}-${color}`;
+        const vendorLogos = {
+            openai: "https://github.com/openai.png",
+            anthropic: "https://github.com/anthropics.png",
+            google: "https://github.com/google.png",
+            alibaba: "https://github.com/QwenLM.png",
+            deepseek: "https://github.com/deepseek-ai.png",
+            meta: "https://github.com/meta.png",
+            mistral: "https://github.com/mistralai.png",
+            zhipu: "https://github.com/THUDM.png",
+            xai: "https://github.com/xai-org.png",
+            minimax: "https://github.com/MiniMax-AI.png",
+            moonshot: "https://github.com/MoonshotAI.png"
+        };
+
+        function drawVendorIcon(ctx, size, color, image) {
+            ctx.clearRect(0, 0, size, size);
+            ctx.fillStyle = '#0a0a0a';
+            ctx.beginPath();
+            ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (image && image.complete && image.naturalWidth) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(size / 2, size / 2, size / 2 - 5, 0, Math.PI * 2);
+                ctx.closePath();
+                ctx.clip();
+                ctx.drawImage(image, 4, 4, size - 8, size - 8);
+                ctx.restore();
+            }
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        function getVendorLogo(vendor) {
+            if (logoCache.has(vendor)) {
+                return logoCache.get(vendor);
+            }
+            const image = new Image();
+            image.crossOrigin = 'anonymous';
+            image.src = vendorLogos[vendor];
+            logoCache.set(vendor, image);
+            return image;
+        }
+
+        function createVendorIcon(vendor, color) {
+            const cacheKey = `${vendor}-${color}`;
             if (iconCache.has(cacheKey)) {
                 return iconCache.get(cacheKey);
             }
@@ -442,31 +492,15 @@
             canvas.height = size;
             const ctx = canvas.getContext('2d');
 
-            ctx.fillStyle = '#0a0a0a';
-            ctx.beginPath();
-            ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
-            ctx.fill();
+            const image = getVendorLogo(vendor);
+            drawVendorIcon(ctx, size, color, image);
 
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
-            ctx.stroke();
-
-            ctx.fillStyle = '#f5f5f5';
-            ctx.font = '600 12px "IBM Plex Mono", monospace';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-
-            const cleaned = model.replace(/[^A-Za-z0-9 ]/g, '').trim();
-            const words = cleaned.split(/\s+/).filter(Boolean);
-            let initials = '';
-            if (words.length > 1) {
-                initials = words.map(word => word[0]).join('').slice(0, 2);
-            } else {
-                initials = cleaned.slice(0, 2);
-            }
-            ctx.fillText((initials || model.slice(0, 2)).toUpperCase(), size / 2, size / 2);
+            image.addEventListener('load', () => {
+                drawVendorIcon(ctx, size, color, image);
+                if (chart) {
+                    chart.update('none');
+                }
+            });
 
             iconCache.set(cacheKey, canvas);
             return canvas;
@@ -490,7 +524,7 @@
                     pointRadius: 12,
                     pointHoverRadius: 15,
                     pointHitRadius: 18,
-                    pointStyle: vendorData.map(d => createModelIcon(d.model, vendorColors[vendor])),
+                    pointStyle: createVendorIcon(vendor, vendorColors[vendor]),
                     showLine: true,
                     borderWidth: 2,
                     tension: 0.2
