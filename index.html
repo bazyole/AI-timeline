@@ -130,7 +130,7 @@
         
         .chart-wrapper {
             position: relative;
-            height: 550px;
+            height: 460px;
             width: 100%;
         }
         
@@ -251,7 +251,7 @@
                 padding: 1.5rem;
             }
             .chart-wrapper {
-                height: 400px;
+                height: 360px;
             }
             .controls {
                 justify-content: center;
@@ -364,17 +364,17 @@
         ];
 
         const vendorColors = {
-            openai: "#ff6b6b",
-            anthropic: "#ffd93d",
-            google: "#6bcf7f",
-            alibaba: "#ff9f43",
-            deepseek: "#a855f7",
-            meta: "#339af0",
-            xai: "#888888",
-            mistral: "#ff8cc8",
-            zhipu: "#22d3ee",
-            minimax: "#f472b6",
-            moonshot: "#facc15"
+            openai: "#10a37f",
+            anthropic: "#f97316",
+            google: "#4285f4",
+            alibaba: "#ff6a00",
+            deepseek: "#7c3aed",
+            meta: "#0866ff",
+            xai: "#9ca3af",
+            mistral: "#ef4444",
+            zhipu: "#06b6d4",
+            minimax: "#ec4899",
+            moonshot: "#fbbf24"
         };
 
         const vendorNames = {
@@ -390,6 +390,20 @@
             minimax: "MiniMax",
             moonshot: "Moonshot"
         };
+
+        const vendorOrder = [
+            "openai",
+            "anthropic",
+            "google",
+            "alibaba",
+            "deepseek",
+            "meta",
+            "xai",
+            "zhipu",
+            "minimax",
+            "moonshot",
+            "mistral"
+        ];
 
         const filterMap = {
             all: null,
@@ -414,10 +428,56 @@
             return data.filter(d => !hiddenVendors.has(d.vendor));
         }
 
+        const iconCache = new Map();
+
+        function createModelIcon(model, color) {
+            const cacheKey = `${model}-${color}`;
+            if (iconCache.has(cacheKey)) {
+                return iconCache.get(cacheKey);
+            }
+
+            const canvas = document.createElement('canvas');
+            const size = 34;
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#0a0a0a';
+            ctx.beginPath();
+            ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.fillStyle = '#f5f5f5';
+            ctx.font = '600 12px "IBM Plex Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            const cleaned = model.replace(/[^A-Za-z0-9 ]/g, '').trim();
+            const words = cleaned.split(/\s+/).filter(Boolean);
+            let initials = '';
+            if (words.length > 1) {
+                initials = words.map(word => word[0]).join('').slice(0, 2);
+            } else {
+                initials = cleaned.slice(0, 2);
+            }
+            ctx.fillText((initials || model.slice(0, 2)).toUpperCase(), size / 2, size / 2);
+
+            iconCache.set(cacheKey, canvas);
+            return canvas;
+        }
+
         function createDatasets(data) {
-            const vendors = [...new Set(data.map(d => d.vendor))];
+            const vendors = vendorOrder.filter(vendor => data.some(d => d.vendor === vendor));
             return vendors.map(vendor => {
-                const vendorData = data.filter(d => d.vendor === vendor);
+                const vendorData = data
+                    .filter(d => d.vendor === vendor)
+                    .sort((a, b) => new Date(a.date) - new Date(b.date));
                 return {
                     label: vendorNames[vendor],
                     data: vendorData.map(d => ({
@@ -427,10 +487,13 @@
                     })),
                     backgroundColor: vendorColors[vendor],
                     borderColor: vendorColors[vendor],
-                    pointRadius: 7,
-                    pointHoverRadius: 11,
-                    pointStyle: 'rectRot',
-                    showLine: false
+                    pointRadius: 12,
+                    pointHoverRadius: 15,
+                    pointHitRadius: 18,
+                    pointStyle: vendorData.map(d => createModelIcon(d.model, vendorColors[vendor])),
+                    showLine: true,
+                    borderWidth: 2,
+                    tension: 0.2
                 };
             });
         }
@@ -445,7 +508,7 @@
         }
 
         function buildLegend() {
-            const vendors = [...new Set(rawData.map(d => d.vendor))];
+            const vendors = vendorOrder.filter(vendor => rawData.some(d => d.vendor === vendor));
             const container = document.getElementById('customLegend');
             container.innerHTML = '';
             
