@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Coding Benchmark</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;600;700&family=IBM+Plex+Mono:wght@400;500&family=Playfair+Display:ital,wght@0,600;1,600&display=swap');
+        
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #141414;
+            --accent-coral: #ff6b6b;
+            --accent-gold: #ffd93d;
+            --accent-cyan: #6bcf7f;
+            --accent-purple: #a855f7;
+            --accent-blue: #339af0;
+            --accent-pink: #ff8cc8;
+            --text-primary: #f5f5f5;
+            --text-secondary: #888;
+            --text-muted: #555;
+            --border: #2a2a2a;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Space Grotesk', sans-serif;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+        
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.03;
+            z-index: 1000;
+            pointer-events: none;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+        
+        header {
+            padding: 4rem 2rem 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(2.5rem, 8vw, 4.5rem);
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #fff 0%, var(--text-secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .subtitle {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 0.8rem;
+            flex-wrap: wrap;
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: rgba(255,255,255,0.015);
+            border: 1px solid var(--border);
+        }
+        
+        .filter-btn {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.72rem;
+            padding: 0.6rem 1.1rem;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.25s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+        
+        .filter-btn:hover {
+            border-color: var(--text-primary);
+            color: var(--text-primary);
+            transform: translateY(-1px);
+        }
+        
+        .filter-btn.active {
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            border-color: var(--text-primary);
+        }
+        
+        .chart-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            padding: 2rem;
+            position: relative;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+        
+        .chart-wrapper {
+            position: relative;
+            height: 550px;
+            width: 100%;
+        }
+        
+        .legend-custom {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            margin-top: 1.8rem;
+            padding-top: 1.8rem;
+            border-top: 1px solid var(--border);
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            cursor: pointer;
+            opacity: 0.75;
+            transition: opacity 0.2s ease;
+        }
+        
+        .legend-item:hover {
+            opacity: 1;
+        }
+        
+        .legend-item.inactive {
+            opacity: 0.2;
+        }
+        
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            transform: rotate(45deg);
+        }
+        
+        .legend-text {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem;
+            margin-top: 3rem;
+        }
+        
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--text-muted);
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 3px;
+            height: 100%;
+        }
+        
+        .stat-card:nth-child(1)::before { background: var(--accent-coral); }
+        .stat-card:nth-child(2)::before { background: var(--accent-gold); }
+        .stat-card:nth-child(3)::before { background: var(--accent-cyan); }
+        .stat-card:nth-child(4)::before { background: var(--accent-purple); }
+        
+        .stat-label {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 0.6rem;
+        }
+        
+        .stat-value {
+            font-size: 2.2rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+        }
+        
+        .stat-meta {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 0.4rem;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-muted);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            border-top: 1px solid var(--border);
+            margin-top: 4rem;
+        }
+        
+        @media (max-width: 768px) {
+            header {
+                padding: 3rem 1.5rem 1.5rem;
+            }
+            .container {
+                padding: 1.5rem;
+            }
+            .chart-wrapper {
+                height: 400px;
+            }
+            .controls {
+                justify-content: center;
+                padding: 1rem;
+            }
+            .chart-container {
+                padding: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Évolution des LLMs</h1>
+        <p class="subtitle">Benchmark Coding • 2022–2026</p>
+    </header>
+    
+    <div class="container">
+        <div class="controls">
+            <button class="filter-btn active" data-filter="all">Tous</button>
+            <button class="filter-btn" data-filter="openai">OpenAI</button>
+            <button class="filter-btn" data-filter="anthropic">Anthropic</button>
+            <button class="filter-btn" data-filter="google">Google</button>
+            <button class="filter-btn" data-filter="alibaba">Alibaba</button>
+            <button class="filter-btn" data-filter="deepseek">DeepSeek</button>
+            <button class="filter-btn" data-filter="meta">Meta</button>
+            <button class="filter-btn" data-filter="other">Autres</button>
+        </div>
+        
+        <div class="chart-container">
+            <div class="chart-wrapper">
+                <canvas id="mainChart"></canvas>
+            </div>
+            <div class="legend-custom" id="customLegend"></div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Score Maximum</div>
+                <div class="stat-value" id="highScore" style="color: var(--accent-coral)">—</div>
+                <div class="stat-meta" id="highScoreModel"></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Progression Moyenne</div>
+                <div class="stat-value" id="avgProgress" style="color: var(--accent-gold)">—</div>
+                <div class="stat-meta">par an depuis 2022</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Modèles Analysés</div>
+                <div class="stat-value" id="modelCount" style="color: var(--accent-cyan)">—</div>
+                <div class="stat-meta">sur cette période</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Dernière Entrée</div>
+                <div class="stat-value" style="color: var(--accent-purple)">Jan 26</div>
+                <div class="stat-meta">Kimi K2.5</div>
+            </div>
+        </div>
+    </div>
+    
+    <footer>
+        Données compilées • Visualisation interactive
+    </footer>
+
+    <script>
+        const rawData = [
+            { model: "GPT-3.5", date: "2022-11-15", score: 923, vendor: "openai" },
+            { model: "Mixtral 8×7B", date: "2023-12-15", score: 829, vendor: "mistral" },
+            { model: "Mistral Large", date: "2024-02-15", score: 797, vendor: "mistral" },
+            { model: "Llama 3", date: "2024-04-15", score: 894, vendor: "meta" },
+            { model: "GPT-4o", date: "2024-05-13", score: 1137, vendor: "openai" },
+            { model: "Claude 3.5 Sonnet", date: "2024-06-20", score: 1082, vendor: "anthropic" },
+            { model: "Llama 3.1", date: "2024-07-15", score: 907, vendor: "meta" },
+            { model: "Gemini 2.0 Flash", date: "2024-12-11", score: 1056, vendor: "google" },
+            { model: "o1", date: "2024-12-15", score: 1081, vendor: "openai" },
+            { model: "DeepSeek-V3", date: "2024-12-26", score: 1073, vendor: "deepseek" },
+            { model: "DeepSeek-R1", date: "2025-01-20", score: 958, vendor: "deepseek" },
+            { model: "Grok-3", date: "2025-02-15", score: 1151, vendor: "xai" },
+            { model: "Claude 3.7 Sonnet", date: "2025-02-15", score: 1231, vendor: "anthropic" },
+            { model: "QwQ-32B", date: "2025-03-15", score: 1064, vendor: "alibaba" },
+            { model: "DeepSeek-V3-0324", date: "2025-03-24", score: 1129, vendor: "deepseek" },
+            { model: "o3", date: "2025-04-16", score: 1075, vendor: "openai" },
+            { model: "o4-mini-high", date: "2025-04-16", score: 1039, vendor: "openai" },
+            { model: "GLM-4", date: "2025-04-15", score: 892, vendor: "zhipu" },
+            { model: "Qwen3", date: "2025-04-28", score: 1282, vendor: "alibaba" },
+            { model: "Claude Sonnet 4", date: "2025-05-15", score: 1203, vendor: "anthropic" },
+            { model: "GPT-4.1", date: "2025-05-14", score: 1173, vendor: "openai" },
+            { model: "o3-pro", date: "2025-06-15", score: 1148, vendor: "openai" },
+            { model: "MiniMax-M1", date: "2025-06-17", score: 689, vendor: "minimax" },
+            { model: "Gemini 2.5 Pro", date: "2025-06-17", score: 1228, vendor: "google" },
+            { model: "Gemini 2.5 Flash", date: "2025-06-17", score: 1130, vendor: "google" },
+            { model: "Grok-4", date: "2025-07-10", score: 1168, vendor: "xai" },
+            { model: "Kimi K2", date: "2025-07-15", score: 1086, vendor: "moonshot" },
+            { model: "GLM-4.5", date: "2025-07-28", score: 1114, vendor: "zhipu" },
+            { model: "GPT-5", date: "2025-08-07", score: 1216, vendor: "openai" },
+            { model: "DeepSeek-V3.1", date: "2025-08-21", score: 1100, vendor: "deepseek" },
+            { model: "Qwen3-Max", date: "2025-09-15", score: 1242, vendor: "alibaba" },
+            { model: "Claude Sonnet 4.5", date: "2025-09-15", score: 1326, vendor: "anthropic" },
+            { model: "GLM-4.6", date: "2025-09-15", score: 1243, vendor: "zhipu" },
+            { model: "DeepSeek-V3.2-Exp", date: "2025-09-29", score: 1154, vendor: "deepseek" },
+            { model: "Claude Haiku 4.5", date: "2025-10-15", score: 1308, vendor: "anthropic" },
+            { model: "MiniMax-M2", date: "2025-10-23", score: 1226, vendor: "minimax" },
+            { model: "GPT-5.1", date: "2025-11-12", score: 1413, vendor: "openai" },
+            { model: "Claude Opus 4.5", date: "2025-11-15", score: 1431, vendor: "anthropic" },
+            { model: "Gemini 3 Pro", date: "2025-11-18", score: 1395, vendor: "google" },
+            { model: "DeepSeek-V3.2", date: "2025-12-01", score: 1259, vendor: "deepseek" },
+            { model: "GPT-5.2", date: "2025-12-11", score: 1368, vendor: "openai" },
+            { model: "GLM-4.7", date: "2025-12-22", score: 1196, vendor: "zhipu" },
+            { model: "Kimi K2.5", date: "2026-01-15", score: 1105, vendor: "moonshot" },
+        ];
+
+        const vendorColors = {
+            openai: "#ff6b6b",
+            anthropic: "#ffd93d",
+            google: "#6bcf7f",
+            alibaba: "#ff9f43",
+            deepseek: "#a855f7",
+            meta: "#339af0",
+            xai: "#888888",
+            mistral: "#ff8cc8",
+            zhipu: "#22d3ee",
+            minimax: "#f472b6",
+            moonshot: "#facc15"
+        };
+
+        const vendorNames = {
+            openai: "OpenAI",
+            anthropic: "Anthropic",
+            google: "Google",
+            alibaba: "Alibaba",
+            deepseek: "DeepSeek",
+            meta: "Meta",
+            xai: "xAI",
+            mistral: "Mistral",
+            zhipu: "Zhipu",
+            minimax: "MiniMax",
+            moonshot: "Moonshot"
+        };
+
+        const filterMap = {
+            all: null,
+            openai: ["openai"],
+            anthropic: ["anthropic"],
+            google: ["google"],
+            alibaba: ["alibaba"],
+            deepseek: ["deepseek"],
+            meta: ["meta"],
+            other: ["xai", "mistral", "zhipu", "minimax", "moonshot"]
+        };
+
+        let chart;
+        let activeFilter = "all";
+        let hiddenVendors = new Set();
+
+        function getFilteredData() {
+            let data = rawData;
+            if (filterMap[activeFilter]) {
+                data = data.filter(d => filterMap[activeFilter].includes(d.vendor));
+            }
+            return data.filter(d => !hiddenVendors.has(d.vendor));
+        }
+
+        function createDatasets(data) {
+            const vendors = [...new Set(data.map(d => d.vendor))];
+            return vendors.map(vendor => {
+                const vendorData = data.filter(d => d.vendor === vendor);
+                return {
+                    label: vendorNames[vendor],
+                    data: vendorData.map(d => ({
+                        x: new Date(d.date),
+                        y: d.score,
+                        model: d.model
+                    })),
+                    backgroundColor: vendorColors[vendor],
+                    borderColor: vendorColors[vendor],
+                    pointRadius: 7,
+                    pointHoverRadius: 11,
+                    pointStyle: 'rectRot',
+                    showLine: false
+                };
+            });
+        }
+
+        function updateStats(data) {
+            const highest = data.reduce((a, b) => a.score > b.score ? a : b);
+            document.getElementById('highScore').textContent = highest.score;
+            document.getElementById('highScoreModel').textContent = highest.model;
+            document.getElementById('modelCount').textContent = data.length;
+            const avgProgress = Math.round((highest.score - 923) / 3.2);
+            document.getElementById('avgProgress').textContent = `+${avgProgress}`;
+        }
+
+        function buildLegend() {
+            const vendors = [...new Set(rawData.map(d => d.vendor))];
+            const container = document.getElementById('customLegend');
+            container.innerHTML = '';
+            
+            vendors.forEach(vendor => {
+                const item = document.createElement('div');
+                item.className = `legend-item${hiddenVendors.has(vendor) ? ' inactive' : ''}`;
+                item.innerHTML = `
+                    <span class="legend-dot" style="background: ${vendorColors[vendor]}"></span>
+                    <span class="legend-text">${vendorNames[vendor]}</span>
+                `;
+                item.addEventListener('click', () => {
+                    if (hiddenVendors.has(vendor)) {
+                        hiddenVendors.delete(vendor);
+                    } else {
+                        hiddenVendors.add(vendor);
+                    }
+                    updateChart();
+                    buildLegend();
+                });
+                container.appendChild(item);
+            });
+        }
+
+        function updateChart() {
+            const data = getFilteredData();
+            chart.data.datasets = createDatasets(data);
+            chart.update('none');
+            updateStats(data);
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            const data = getFilteredData();
+            
+            chart = new Chart(ctx, {
+                type: 'scatter',
+                data: { datasets: createDatasets(data) },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'nearest',
+                        intersect: true
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(20, 20, 20, 0.95)',
+                            titleColor: '#fff',
+                            bodyColor: '#aaa',
+                            borderColor: '#333',
+                            borderWidth: 1,
+                            cornerRadius: 2,
+                            padding: 14,
+                            titleFont: {
+                                family: 'Space Grotesk',
+                                size: 14,
+                                weight: '600'
+                            },
+                            bodyFont: {
+                                family: 'IBM Plex Mono',
+                                size: 11
+                            },
+                            callbacks: {
+                                title: (items) => items[0]?.raw?.model || '',
+                                label: (item) => `Score: ${item.raw.y}`,
+                                afterLabel: (item) => {
+                                    const date = new Date(item.raw.x);
+                                    return date.toLocaleDateString('fr-FR', { 
+                                        month: 'long', 
+                                        year: 'numeric' 
+                                    });
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'month',
+                                displayFormats: { month: 'MMM yy' }
+                            },
+                            grid: {
+                                color: '#2a2a2a',
+                                drawBorder: false
+                            },
+                            ticks: {
+                                color: '#555',
+                                font: { family: 'IBM Plex Mono', size: 10 }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Date de sortie',
+                                color: '#666',
+                                font: { family: 'Space Grotesk', size: 11 }
+                            }
+                        },
+                        y: {
+                            min: 600,
+                            max: 1500,
+                            grid: {
+                                color: '#2a2a2a',
+                                drawBorder: false
+                            },
+                            ticks: {
+                                color: '#555',
+                                font: { family: 'IBM Plex Mono', size: 10 }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Score Coding',
+                                color: '#666',
+                                font: { family: 'Space Grotesk', size: 11 }
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 800,
+                        easing: 'easeOutQuart'
+                    }
+                }
+            });
+            
+            updateStats(data);
+            buildLegend();
+        }
+
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                activeFilter = btn.dataset.filter;
+                updateChart();
+            });
+        });
+
+        initChart();
+    </script>
+</body>
+</html>
