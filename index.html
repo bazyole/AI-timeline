@@ -445,14 +445,28 @@
             moonshot: "https://github.com/MoonshotAI.png"
         };
 
-        function drawVendorIcon(ctx, size, color, image) {
+        const vendorInitials = {
+            openai: "O",
+            anthropic: "A",
+            google: "G",
+            alibaba: "Q",
+            deepseek: "D",
+            meta: "M",
+            xai: "X",
+            mistral: "Mi",
+            zhipu: "Z",
+            minimax: "Mx",
+            moonshot: "K"
+        };
+
+        function drawVendorIcon(ctx, size, color, image, initials) {
             ctx.clearRect(0, 0, size, size);
             ctx.fillStyle = '#0a0a0a';
             ctx.beginPath();
             ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
             ctx.fill();
 
-            if (image && image.complete && image.naturalWidth) {
+            if (image && image.complete && image.naturalWidth && !image.dataset.failed) {
                 ctx.save();
                 ctx.beginPath();
                 ctx.arc(size / 2, size / 2, size / 2 - 5, 0, Math.PI * 2);
@@ -460,6 +474,12 @@
                 ctx.clip();
                 ctx.drawImage(image, 4, 4, size - 8, size - 8);
                 ctx.restore();
+            } else if (initials) {
+                ctx.fillStyle = '#f5f5f5';
+                ctx.font = '600 12px "IBM Plex Mono", monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(initials, size / 2, size / 2);
             }
 
             ctx.strokeStyle = color;
@@ -474,8 +494,13 @@
                 return logoCache.get(vendor);
             }
             const image = new Image();
-            image.crossOrigin = 'anonymous';
             image.src = vendorLogos[vendor];
+            image.addEventListener('error', () => {
+                image.dataset.failed = 'true';
+                if (chart) {
+                    chart.update('none');
+                }
+            });
             logoCache.set(vendor, image);
             return image;
         }
@@ -493,10 +518,10 @@
             const ctx = canvas.getContext('2d');
 
             const image = getVendorLogo(vendor);
-            drawVendorIcon(ctx, size, color, image);
+            drawVendorIcon(ctx, size, color, image, vendorInitials[vendor]);
 
             image.addEventListener('load', () => {
-                drawVendorIcon(ctx, size, color, image);
+                drawVendorIcon(ctx, size, color, image, vendorInitials[vendor]);
                 if (chart) {
                     chart.update('none');
                 }
