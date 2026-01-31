@@ -232,6 +232,18 @@ h1 {
     background: var(--logo-bg, #fff);
     color: var(--logo-color, #0a0a0a);
     text-transform: uppercase;
+    overflow: hidden;
+}
+
+.legend-logo.has-image {
+    background: transparent;
+}
+
+.legend-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
 }
 
 .legend-text {

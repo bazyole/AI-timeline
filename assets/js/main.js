@@ -6,6 +6,8 @@ const LATEST_LABEL_OPACITY = 0.9;
 const SECONDARY_LABEL_OPACITY = 0.45;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const LABEL_RANGE_THRESHOLD_MS = 548 * ONE_DAY_MS;
+const vendorImageCache = new Map();
+const vendorImageLoading = new Set();
 
 const today = new Date();
 const dateExtent = rawData.reduce(
@@ -48,6 +50,39 @@ function getLogoTextColor(hex) {
     return luminance > 0.72 ? '#0a0a0a' : '#f5f5f5';
 }
 
+function isLogoUrl(logo) {
+    return typeof logo === 'string' && /^https?:\/\//i.test(logo);
+}
+
+function getVendorImage(vendor) {
+    if (vendorImageCache.has(vendor)) {
+        return vendorImageCache.get(vendor);
+    }
+    if (vendorImageLoading.has(vendor)) {
+        return null;
+    }
+    const logo = vendorLogos[vendor];
+    if (!isLogoUrl(logo)) {
+        return null;
+    }
+    vendorImageLoading.add(vendor);
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => {
+        vendorImageCache.set(vendor, image);
+        vendorImageLoading.delete(vendor);
+        if (chart) {
+            chart.update('none');
+        }
+        buildLegend();
+    };
+    image.onerror = () => {
+        vendorImageLoading.delete(vendor);
+    };
+    image.src = logo;
+    return null;
+}
+
 function createVendorIcon(vendor, color, alpha) {
     const canvas = document.createElement('canvas');
     const size = 14;
@@ -56,6 +91,7 @@ function createVendorIcon(vendor, color, alpha) {
     const ctx = canvas.getContext('2d');
     const logoText = vendorLogos[vendor] ?? vendorNames[vendor]?.[0] ?? '';
     const textColor = getLogoTextColor(color);
+    const logoImage = getVendorImage(vendor);
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.fillStyle = color;
@@ -63,11 +99,21 @@ function createVendorIcon(vendor, color, alpha) {
     ctx.arc(size / 2, size / 2, 6, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = Math.min(1, alpha + 0.2);
-    ctx.fillStyle = textColor;
-    ctx.font = '600 6px "IBM Plex Mono", monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(logoText, size / 2, size / 2 + 0.5);
+    if (logoImage) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(size / 2, size / 2, 6, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(logoImage, 1, 1, size - 2, size - 2);
+        ctx.restore();
+    } else {
+        ctx.fillStyle = textColor;
+        ctx.font = '600 6px "IBM Plex Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(logoText, size / 2, size / 2 + 0.5);
+    }
     ctx.restore();
     return canvas;
 }
@@ -161,12 +207,15 @@ function buildLegend() {
     container.innerHTML = '';
 
     vendors.forEach(vendor => {
-        const logoText = vendorLogos[vendor] ?? vendorNames[vendor]?.[0] ?? '';
+        const logoValue = vendorLogos[vendor] ?? vendorNames[vendor]?.[0] ?? '';
+        const logoIsUrl = isLogoUrl(logoValue);
         const textColor = getLogoTextColor(vendorColors[vendor]);
         const item = document.createElement('div');
         item.className = `legend-item${hiddenVendors.has(vendor) ? ' inactive' : ''}`;
         item.innerHTML = `
-            <span class="legend-logo" style="--logo-bg: ${vendorColors[vendor]}; --logo-color: ${textColor};">${logoText}</span>
+            <span class="legend-logo${logoIsUrl ? ' has-image' : ''}" style="--logo-bg: ${vendorColors[vendor]}; --logo-color: ${textColor};">
+                ${logoIsUrl ? `<img src="${logoValue}" alt="${vendorNames[vendor]} logo" loading="lazy" />` : logoValue}
+            </span>
             <span class="legend-text">${vendorNames[vendor]}</span>
         `;
         item.addEventListener('click', () => {
@@ -179,6 +228,13 @@ function buildLegend() {
             buildLegend();
         });
         container.appendChild(item);
+        if (logoIsUrl) {
+            const img = item.querySelector('img');
+            img.addEventListener('error', () => {
+                img.remove();
+                item.querySelector('.legend-logo').textContent = vendorNames[vendor]?.[0] ?? '';
+            });
+        }
     });
 }
 
