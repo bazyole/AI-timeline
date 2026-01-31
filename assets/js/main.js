@@ -1,4 +1,4 @@
-import { filterMap, rawData, vendorColors, vendorNames, vendorOrder } from './data.js';
+import { filterMap, rawData, vendorColors, vendorLogos, vendorNames, vendorOrder } from './data.js';
 
 const LINE_OPACITY = 0.7;
 const SECONDARY_POINT_OPACITY = 0.4;
@@ -39,17 +39,35 @@ function getFilteredData() {
     return rawData.filter(item => filters.includes(item.vendor) && !hiddenVendors.has(item.vendor));
 }
 
+function getLogoTextColor(hex) {
+    const sanitized = hex.replace('#', '');
+    const r = parseInt(sanitized.substring(0, 2), 16);
+    const g = parseInt(sanitized.substring(2, 4), 16);
+    const b = parseInt(sanitized.substring(4, 6), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.72 ? '#0a0a0a' : '#f5f5f5';
+}
+
 function createVendorIcon(vendor, color, alpha) {
     const canvas = document.createElement('canvas');
     const size = 14;
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext('2d');
+    const logoText = vendorLogos[vendor] ?? vendorNames[vendor]?.[0] ?? '';
+    const textColor = getLogoTextColor(color);
     ctx.save();
-    ctx.translate(size / 2, size / 2);
-    ctx.rotate(Math.PI / 4);
-    ctx.fillStyle = withAlpha(color, alpha);
-    ctx.fillRect(-5, -5, 10, 10);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = Math.min(1, alpha + 0.2);
+    ctx.fillStyle = textColor;
+    ctx.font = '600 6px "IBM Plex Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(logoText, size / 2, size / 2 + 0.5);
     ctx.restore();
     return canvas;
 }
@@ -143,10 +161,12 @@ function buildLegend() {
     container.innerHTML = '';
 
     vendors.forEach(vendor => {
+        const logoText = vendorLogos[vendor] ?? vendorNames[vendor]?.[0] ?? '';
+        const textColor = getLogoTextColor(vendorColors[vendor]);
         const item = document.createElement('div');
         item.className = `legend-item${hiddenVendors.has(vendor) ? ' inactive' : ''}`;
         item.innerHTML = `
-            <span class="legend-dot" style="background: ${vendorColors[vendor]}"></span>
+            <span class="legend-logo" style="--logo-bg: ${vendorColors[vendor]}; --logo-color: ${textColor};">${logoText}</span>
             <span class="legend-text">${vendorNames[vendor]}</span>
         `;
         item.addEventListener('click', () => {

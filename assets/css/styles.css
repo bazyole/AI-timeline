@@ -218,6 +218,22 @@ h1 {
     transform: rotate(45deg);
 }
 
+.legend-logo {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.55rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    background: var(--logo-bg, #fff);
+    color: var(--logo-color, #0a0a0a);
+    text-transform: uppercase;
+}
+
 .legend-text {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.75rem;
