@@ -951,17 +951,25 @@
                             pan: {
                                 enabled: true,
                                 mode: 'xy',
-                                threshold: 0
+                                threshold: 0,
+                                mouseButtons: {
+                                    left: false,
+                                    middle: false,
+                                    right: true
+                                }
                             },
                             zoom: {
                                 wheel: {
-                                    enabled: true
+                                    enabled: false
                                 },
                                 pinch: {
-                                    enabled: true
+                                    enabled: false
                                 },
                                 drag: {
-                                    enabled: false
+                                    enabled: true,
+                                    borderColor: 'rgba(245, 245, 245, 0.6)',
+                                    borderWidth: 1,
+                                    backgroundColor: 'rgba(245, 245, 245, 0.08)'
                                 },
                                 mode: 'xy'
                             }
@@ -1072,6 +1080,10 @@
         });
         document.querySelectorAll('[data-range]').forEach(btn => {
             btn.addEventListener('click', () => applyDateRange(btn.dataset.range));
+        });
+
+        document.getElementById('mainChart').addEventListener('contextmenu', (event) => {
+            event.preventDefault();
         });
 
         initChart();
