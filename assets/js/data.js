@@ -72,6 +72,20 @@ export const vendorNames = {
     moonshot: "Moonshot"
 };
 
+export const vendorLogos = {
+    openai: "OA",
+    anthropic: "A",
+    google: "G",
+    alibaba: "Q",
+    deepseek: "DS",
+    meta: "M",
+    xai: "xAI",
+    mistral: "Mi",
+    zhipu: "Z",
+    minimax: "MM",
+    moonshot: "K"
+};
+
 export const vendorOrder = [
     "openai",
     "anthropic",
