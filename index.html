@@ -525,6 +525,7 @@
         let hiddenVendors = new Set(["zhipu", "minimax", "meta", "mistral"]);
         let autoYEnabled = true;
         const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+        const LABEL_RANGE_THRESHOLD_MS = 548 * ONE_DAY_MS;
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const defaultYMin = 950;
@@ -882,6 +883,11 @@
             id: 'modelLabels',
             afterDatasetsDraw(chartInstance) {
                 const { ctx } = chartInstance;
+                const xScale = chartInstance.scales.x;
+                const xMin = xScale?.min ?? defaultXMin.getTime();
+                const xMax = xScale?.max ?? defaultXMax.getTime();
+                const rangeMs = xMax - xMin;
+                const showAllLabels = rangeMs <= LABEL_RANGE_THRESHOLD_MS;
                 ctx.save();
                 ctx.font = '500 9px "IBM Plex Mono", monospace';
                 ctx.fillStyle = 'rgba(245, 245, 245, 0.85)';
@@ -895,6 +901,7 @@
                     meta.data.forEach((element, index) => {
                         const pointData = dataset.data[index];
                         if (!pointData || !pointData.model) return;
+                        if (!showAllLabels && index !== lastIndex) return;
                         const position = element.tooltipPosition();
                         ctx.globalAlpha = index === lastIndex ? LATEST_LABEL_OPACITY : SECONDARY_LABEL_OPACITY;
                         ctx.fillText(pointData.model, position.x + 8, position.y - 8);
