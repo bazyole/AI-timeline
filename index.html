@@ -960,10 +960,11 @@
                             },
                             zoom: {
                                 wheel: {
-                                    enabled: false
+                                    enabled: true,
+                                    speed: 0.05
                                 },
                                 pinch: {
-                                    enabled: false
+                                    enabled: true
                                 },
                                 drag: {
                                     enabled: true,
@@ -1060,6 +1061,57 @@
             setAxisInputs();
         }
 
+        function panChartBy(deltaX, deltaY) {
+            if (!chart) return;
+            const xScale = chart.scales.x;
+            const yScale = chart.scales.y;
+            const xMin = xScale?.min ?? defaultXMin.getTime();
+            const xMax = xScale?.max ?? defaultXMax.getTime();
+            const yMin = yScale?.min ?? defaultYMin;
+            const yMax = yScale?.max ?? defaultYMax;
+
+            chart.options.scales.x.min = new Date(xMin + deltaX);
+            chart.options.scales.x.max = new Date(xMax + deltaX);
+            chart.options.scales.y.min = yMin + deltaY;
+            chart.options.scales.y.max = yMax + deltaY;
+            autoYEnabled = false;
+            chart.update('none');
+        }
+
+        function handleArrowPan(event) {
+            if (!chart) return;
+            const xScale = chart.scales.x;
+            const yScale = chart.scales.y;
+            if (!xScale || !yScale) return;
+
+            const xRange = (xScale.max ?? defaultXMax.getTime()) - (xScale.min ?? defaultXMin.getTime());
+            const yRange = (yScale.max ?? defaultYMax) - (yScale.min ?? defaultYMin);
+            const stepFactor = event.shiftKey ? 0.2 : 0.08;
+            const xStep = xRange * stepFactor;
+            const yStep = yRange * stepFactor;
+
+            switch (event.key) {
+                case 'ArrowLeft':
+                    event.preventDefault();
+                    panChartBy(-xStep, 0);
+                    break;
+                case 'ArrowRight':
+                    event.preventDefault();
+                    panChartBy(xStep, 0);
+                    break;
+                case 'ArrowUp':
+                    event.preventDefault();
+                    panChartBy(0, yStep);
+                    break;
+                case 'ArrowDown':
+                    event.preventDefault();
+                    panChartBy(0, -yStep);
+                    break;
+                default:
+                    break;
+            }
+        }
+
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
@@ -1085,6 +1137,8 @@
         document.getElementById('mainChart').addEventListener('contextmenu', (event) => {
             event.preventDefault();
         });
+
+        window.addEventListener('keydown', handleArrowPan);
 
         initChart();
     </script>
