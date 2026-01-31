@@ -577,7 +577,9 @@
             moonshot: "K"
         };
 
-        function drawVendorIcon(ctx, size, color, image, initials) {
+        function drawVendorIcon(ctx, size, color, image, initials, opacity = 1) {
+            ctx.save();
+            ctx.globalAlpha = opacity;
             ctx.clearRect(0, 0, size, size);
             ctx.fillStyle = '#0a0a0a';
             ctx.beginPath();
@@ -605,6 +607,7 @@
             ctx.beginPath();
             ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
             ctx.stroke();
+            ctx.restore();
         }
 
         function getVendorLogo(vendor) {
@@ -623,8 +626,8 @@
             return image;
         }
 
-        function createVendorIcon(vendor, color) {
-            const cacheKey = `${vendor}-${color}`;
+        function createVendorIcon(vendor, color, opacity = 1) {
+            const cacheKey = `${vendor}-${color}-${opacity}`;
             if (iconCache.has(cacheKey)) {
                 return iconCache.get(cacheKey);
             }
@@ -636,10 +639,10 @@
             const ctx = canvas.getContext('2d');
 
             const image = getVendorLogo(vendor);
-            drawVendorIcon(ctx, size, color, image, vendorInitials[vendor]);
+            drawVendorIcon(ctx, size, color, image, vendorInitials[vendor], opacity);
 
             image.addEventListener('load', () => {
-                drawVendorIcon(ctx, size, color, image, vendorInitials[vendor]);
+                drawVendorIcon(ctx, size, color, image, vendorInitials[vendor], opacity);
                 if (chart) {
                     chart.update('none');
                 }
@@ -649,15 +652,44 @@
             return canvas;
         }
 
-        function getGoogleGradient(ctx, chartArea) {
+        const LINE_OPACITY = 0.85;
+        const SECONDARY_POINT_OPACITY = 0.75;
+        const LATEST_LABEL_OPACITY = 0.8;
+        const SECONDARY_LABEL_OPACITY = 0.55;
+
+        function hexToRgba(hex, alpha) {
+            const normalized = hex.replace('#', '');
+            const value = normalized.length === 3
+                ? normalized.split('').map((char) => char + char).join('')
+                : normalized;
+            const r = parseInt(value.slice(0, 2), 16);
+            const g = parseInt(value.slice(2, 4), 16);
+            const b = parseInt(value.slice(4, 6), 16);
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        function withAlpha(color, alpha) {
+            if (color.startsWith('#')) {
+                return hexToRgba(color, alpha);
+            }
+            if (color.startsWith('rgb')) {
+                return color.replace(/rgba?\(([^)]+)\)/, (_, values) => {
+                    const [r, g, b] = values.split(',').map((value) => value.trim());
+                    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                });
+            }
+            return color;
+        }
+
+        function getGoogleGradient(ctx, chartArea, alpha = 1) {
             if (!chartArea) {
-                return vendorColors.google;
+                return withAlpha(vendorColors.google, alpha);
             }
             const gradient = ctx.createLinearGradient(chartArea.left, chartArea.top, chartArea.right, chartArea.bottom);
-            gradient.addColorStop(0, "#4285f4");
-            gradient.addColorStop(0.33, "#34a853");
-            gradient.addColorStop(0.66, "#fbbc05");
-            gradient.addColorStop(1, "#ea4335");
+            gradient.addColorStop(0, `rgba(66, 133, 244, ${alpha})`);
+            gradient.addColorStop(0.33, `rgba(52, 168, 83, ${alpha})`);
+            gradient.addColorStop(0.66, `rgba(251, 188, 5, ${alpha})`);
+            gradient.addColorStop(1, `rgba(234, 67, 53, ${alpha})`);
             return gradient;
         }
 
@@ -679,6 +711,19 @@
                     .sort((a, b) => new Date(a.date) - new Date(b.date));
                 const highlightIndex = vendorData.length - 1;
                 const hasGradient = vendor === "google";
+                const lineColor = hasGradient
+                    ? (context) => getGoogleGradient(context.chart.ctx, context.chart.chartArea, LINE_OPACITY)
+                    : withAlpha(vendorColors[vendor], LINE_OPACITY);
+                const pointColor = (context) => {
+                    const alpha = context.dataIndex === highlightIndex ? 1 : SECONDARY_POINT_OPACITY;
+                    return hasGradient
+                        ? getGoogleGradient(context.chart.ctx, context.chart.chartArea, alpha)
+                        : withAlpha(vendorColors[vendor], alpha);
+                };
+                const pointIcon = (context) => {
+                    const alpha = context.dataIndex === highlightIndex ? 1 : SECONDARY_POINT_OPACITY;
+                    return createVendorIcon(vendor, vendorColors[vendor], alpha);
+                };
                 return {
                     label: vendorNames[vendor],
                     data: vendorData.map(d => ({
@@ -686,23 +731,15 @@
                         y: d.score,
                         model: d.model
                     })),
-                    backgroundColor: hasGradient
-                        ? (context) => getGoogleGradient(context.chart.ctx, context.chart.chartArea)
-                        : vendorColors[vendor],
-                    borderColor: hasGradient
-                        ? (context) => getGoogleGradient(context.chart.ctx, context.chart.chartArea)
-                        : vendorColors[vendor],
-                    pointBackgroundColor: hasGradient
-                        ? (context) => getGoogleGradient(context.chart.ctx, context.chart.chartArea)
-                        : vendorColors[vendor],
-                    pointBorderColor: hasGradient
-                        ? (context) => getGoogleGradient(context.chart.ctx, context.chart.chartArea)
-                        : vendorColors[vendor],
+                    backgroundColor: lineColor,
+                    borderColor: lineColor,
+                    pointBackgroundColor: pointColor,
+                    pointBorderColor: pointColor,
                     pointRadius: (context) => (context.dataIndex === highlightIndex ? 13 : 7),
                     pointHoverRadius: (context) => (context.dataIndex === highlightIndex ? 15 : 10),
                     pointBorderWidth: (context) => (context.dataIndex === highlightIndex ? 4 : 2),
                     pointHitRadius: 14,
-                    pointStyle: createVendorIcon(vendor, vendorColors[vendor]),
+                    pointStyle: pointIcon,
                     showLine: true,
                     borderWidth: 2,
                     tension: 0.2,
@@ -847,17 +884,19 @@
                 const { ctx } = chartInstance;
                 ctx.save();
                 ctx.font = '500 9px "IBM Plex Mono", monospace';
-                ctx.fillStyle = 'rgba(245, 245, 245, 0.7)';
+                ctx.fillStyle = 'rgba(245, 245, 245, 0.85)';
                 ctx.textAlign = 'left';
                 ctx.textBaseline = 'middle';
 
                 chartInstance.data.datasets.forEach((dataset, datasetIndex) => {
                     const meta = chartInstance.getDatasetMeta(datasetIndex);
                     if (meta.hidden) return;
+                    const lastIndex = dataset.data.length - 1;
                     meta.data.forEach((element, index) => {
                         const pointData = dataset.data[index];
                         if (!pointData || !pointData.model) return;
                         const position = element.tooltipPosition();
+                        ctx.globalAlpha = index === lastIndex ? LATEST_LABEL_OPACITY : SECONDARY_LABEL_OPACITY;
                         ctx.fillText(pointData.model, position.x + 8, position.y - 8);
                     });
                 });
