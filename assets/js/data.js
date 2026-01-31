@@ -73,17 +73,17 @@ export const vendorNames = {
 };
 
 export const vendorLogos = {
-    openai: "OA",
-    anthropic: "A",
-    google: "G",
-    alibaba: "Q",
-    deepseek: "DS",
-    meta: "M",
-    xai: "xAI",
-    mistral: "Mi",
-    zhipu: "Z",
-    minimax: "MM",
-    moonshot: "K"
+    openai: "https://github.com/openai.png",
+    anthropic: "https://github.com/anthropics.png",
+    google: "https://github.com/google.png",
+    alibaba: "https://github.com/QwenLM.png",
+    deepseek: "https://github.com/deepseek-ai.png",
+    meta: "https://github.com/meta.png",
+    mistral: "https://github.com/mistralai.png",
+    zhipu: "https://pbs.twimg.com/profile_images/1970775077181411328/W8XKaUIh.jpg",
+    xai: "https://github.com/xai-org.png",
+    minimax: "https://registry.npmmirror.com/@lobehub/icons-static-png/1.75.0/files/dark/minimax-color.png",
+    moonshot: "https://aimode.co/wp-content/uploads/2025/03/Kimi-AI-Logo.webp"
 };
 
 export const vendorOrder = [
