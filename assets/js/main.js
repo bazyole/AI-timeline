@@ -6,9 +6,6 @@ const LATEST_LABEL_OPACITY = 0.9;
 const SECONDARY_LABEL_OPACITY = 0.45;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const LABEL_RANGE_THRESHOLD_MS = 548 * ONE_DAY_MS;
-const POINT_RADIUS_PRIMARY = 18;
-const POINT_RADIUS_SECONDARY = 11;
-const POINT_ICON_PADDING = 3;
 const vendorImageCache = new Map();
 const vendorImageLoading = new Set();
 
@@ -86,39 +83,36 @@ function getVendorImage(vendor) {
     return null;
 }
 
-function createVendorIcon(vendor, color, alpha, radius) {
+function createVendorIcon(vendor, color, alpha) {
     const canvas = document.createElement('canvas');
-    const size = radius * 2 + POINT_ICON_PADDING * 2;
+    const size = 14;
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext('2d');
     const logoText = vendorLogos[vendor] ?? vendorNames[vendor]?.[0] ?? '';
     const textColor = getLogoTextColor(color);
     const logoImage = getVendorImage(vendor);
-    const center = size / 2;
-    const innerRadius = radius;
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(center, center, innerRadius, 0, Math.PI * 2);
+    ctx.arc(size / 2, size / 2, 6, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = Math.min(1, alpha + 0.2);
     if (logoImage) {
         ctx.save();
         ctx.beginPath();
-        ctx.arc(center, center, innerRadius, 0, Math.PI * 2);
+        ctx.arc(size / 2, size / 2, 6, 0, Math.PI * 2);
         ctx.closePath();
         ctx.clip();
-        const inset = POINT_ICON_PADDING;
-        ctx.drawImage(logoImage, inset, inset, size - inset * 2, size - inset * 2);
+        ctx.drawImage(logoImage, 1, 1, size - 2, size - 2);
         ctx.restore();
     } else {
         ctx.fillStyle = textColor;
-        ctx.font = `600 ${Math.max(8, radius - 2)}px "IBM Plex Mono", monospace`;
+        ctx.font = '600 6px "IBM Plex Mono", monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(logoText, center, center + 0.5);
+        ctx.fillText(logoText, size / 2, size / 2 + 0.5);
     }
     ctx.restore();
     return canvas;
@@ -171,10 +165,8 @@ function createDatasets(data) {
                 : withAlpha(vendorColors[vendor], alpha);
         };
         const pointIcon = (context) => {
-            const isHighlight = context.dataIndex === highlightIndex;
-            const alpha = isHighlight ? 1 : SECONDARY_POINT_OPACITY;
-            const radius = isHighlight ? POINT_RADIUS_PRIMARY : POINT_RADIUS_SECONDARY;
-            return createVendorIcon(vendor, vendorColors[vendor], alpha, radius);
+            const alpha = context.dataIndex === highlightIndex ? 1 : SECONDARY_POINT_OPACITY;
+            return createVendorIcon(vendor, vendorColors[vendor], alpha);
         };
         return {
             label: vendorNames[vendor],
@@ -187,10 +179,10 @@ function createDatasets(data) {
             borderColor: lineColor,
             pointBackgroundColor: pointColor,
             pointBorderColor: pointColor,
-            pointRadius: (context) => (context.dataIndex === highlightIndex ? POINT_RADIUS_PRIMARY : POINT_RADIUS_SECONDARY),
-            pointHoverRadius: (context) => (context.dataIndex === highlightIndex ? POINT_RADIUS_PRIMARY + 3 : POINT_RADIUS_SECONDARY + 2),
+            pointRadius: (context) => (context.dataIndex === highlightIndex ? 13 : 7),
+            pointHoverRadius: (context) => (context.dataIndex === highlightIndex ? 15 : 10),
             pointBorderWidth: (context) => (context.dataIndex === highlightIndex ? 4 : 2),
-            pointHitRadius: POINT_RADIUS_PRIMARY + 4,
+            pointHitRadius: 14,
             pointStyle: pointIcon,
             showLine: true,
             borderWidth: 2,
