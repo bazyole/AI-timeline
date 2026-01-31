@@ -369,6 +369,8 @@
                 </div>
                 <div class="control-group">
                     <span class="control-label">Période</span>
+                    <button class="control-btn" data-range="90">3M</button>
+                    <button class="control-btn" data-range="180">6M</button>
                     <button class="control-btn" data-range="365">1Y</button>
                     <button class="control-btn" data-range="730">2Y</button>
                     <button class="control-btn" data-range="1825">5Y</button>
@@ -521,6 +523,7 @@
         let chart;
         let activeFilter = "all";
         let hiddenVendors = new Set(["zhipu", "minimax", "meta", "mistral"]);
+        let autoYEnabled = true;
         const ONE_DAY_MS = 24 * 60 * 60 * 1000;
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -695,9 +698,9 @@
                     pointBorderColor: hasGradient
                         ? (context) => getGoogleGradient(context.chart.ctx, context.chart.chartArea)
                         : vendorColors[vendor],
-                    pointRadius: (context) => (context.dataIndex === highlightIndex ? 12 : 9),
-                    pointHoverRadius: (context) => (context.dataIndex === highlightIndex ? 14 : 11),
-                    pointBorderWidth: (context) => (context.dataIndex === highlightIndex ? 3 : 2),
+                    pointRadius: (context) => (context.dataIndex === highlightIndex ? 13 : 7),
+                    pointHoverRadius: (context) => (context.dataIndex === highlightIndex ? 15 : 10),
+                    pointBorderWidth: (context) => (context.dataIndex === highlightIndex ? 4 : 2),
                     pointHitRadius: 14,
                     pointStyle: createVendorIcon(vendor, vendorColors[vendor]),
                     showLine: true,
@@ -742,9 +745,38 @@
             });
         }
 
+        function getYBounds(data) {
+            if (!data.length) {
+                return { min: defaultYMin, max: defaultYMax };
+            }
+            const scores = data.map(item => item.score);
+            let min = Math.min(...scores);
+            let max = Math.max(...scores);
+            if (min === max) {
+                min -= 20;
+                max += 20;
+            }
+            const padding = (max - min) * 0.08;
+            return {
+                min: Math.max(0, Math.floor(min - padding)),
+                max: Math.ceil(max + padding)
+            };
+        }
+
         function updateChart() {
             const data = getFilteredData();
             chart.data.datasets = createDatasets(data);
+            if (autoYEnabled) {
+                const bounds = getYBounds(data);
+                chart.options.scales.y.min = bounds.min;
+                chart.options.scales.y.max = bounds.max;
+                setAxisInputs(
+                    chart.options.scales.x.min || defaultXMin,
+                    chart.options.scales.x.max || defaultXMax,
+                    bounds.min,
+                    bounds.max
+                );
+            }
             chart.update('none');
             updateStats(data);
         }
@@ -778,6 +810,7 @@
                 const maxValue = document.getElementById('yMax').value;
                 chart.options.scales.y.min = minValue ? Number(minValue) : undefined;
                 chart.options.scales.y.max = maxValue ? Number(maxValue) : undefined;
+                autoYEnabled = false;
             }
             chart.update('none');
         }
@@ -787,6 +820,7 @@
             chart.options.scales.x.max = defaultXMax;
             chart.options.scales.y.min = defaultYMin;
             chart.options.scales.y.max = defaultYMax;
+            autoYEnabled = true;
             setAxisInputs();
         }
 
@@ -802,10 +836,9 @@
                 chart.options.scales.x.max = endDate;
             }
             chart.options.scales.x.min = startDate;
-            chart.options.scales.y.min = defaultYMin;
-            chart.options.scales.y.max = defaultYMax;
-            setAxisInputs(startDate, chart.options.scales.x.max, defaultYMin, defaultYMax);
-            chart.update('none');
+            autoYEnabled = true;
+            updateChart();
+            setAxisInputs(startDate, chart.options.scales.x.max, chart.options.scales.y.min, chart.options.scales.y.max);
         }
 
         const modelLabelPlugin = {
@@ -833,6 +866,30 @@
             }
         };
 
+        const latestModelHighlightPlugin = {
+            id: 'latestModelHighlight',
+            afterDatasetsDraw(chartInstance) {
+                const { ctx } = chartInstance;
+                ctx.save();
+                chartInstance.data.datasets.forEach((dataset, datasetIndex) => {
+                    const meta = chartInstance.getDatasetMeta(datasetIndex);
+                    if (meta.hidden) return;
+                    const lastIndex = dataset.data.length - 1;
+                    const point = meta.data[lastIndex];
+                    if (!point) return;
+                    const position = point.tooltipPosition();
+                    const baseRadius = point.options?.radius || 10;
+                    ctx.strokeStyle = dataset.borderColor;
+                    ctx.lineWidth = 2;
+                    ctx.globalAlpha = 0.45;
+                    ctx.beginPath();
+                    ctx.arc(position.x, position.y, baseRadius + 7, 0, Math.PI * 2);
+                    ctx.stroke();
+                });
+                ctx.restore();
+            }
+        };
+
         function initChart() {
             const ctx = document.getElementById('mainChart').getContext('2d');
             const data = getFilteredData();
@@ -850,10 +907,12 @@
                     plugins: {
                         legend: { display: false },
                         modelLabels: {},
+                        latestModelHighlight: {},
                         zoom: {
                             pan: {
                                 enabled: true,
-                                mode: 'xy'
+                                mode: 'xy',
+                                threshold: 0
                             },
                             zoom: {
                                 wheel: {
@@ -863,7 +922,7 @@
                                     enabled: true
                                 },
                                 drag: {
-                                    enabled: true
+                                    enabled: false
                                 },
                                 mode: 'xy'
                             }
@@ -946,7 +1005,7 @@
                         easing: 'easeOutQuart'
                     }
                 },
-                plugins: [modelLabelPlugin]
+                plugins: [modelLabelPlugin, latestModelHighlightPlugin]
             });
             
             updateStats(data);
