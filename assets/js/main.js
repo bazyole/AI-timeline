@@ -85,7 +85,7 @@ function getVendorImage(vendor) {
 
 function createVendorIcon(vendor, color, alpha) {
     const canvas = document.createElement('canvas');
-    const size = 14;
+    const size = 16;
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext('2d');
@@ -96,16 +96,16 @@ function createVendorIcon(vendor, color, alpha) {
     ctx.globalAlpha = alpha;
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(size / 2, size / 2, 6, 0, Math.PI * 2);
+    ctx.arc(size / 2, size / 2, 7, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = Math.min(1, alpha + 0.2);
     if (logoImage) {
         ctx.save();
         ctx.beginPath();
-        ctx.arc(size / 2, size / 2, 6, 0, Math.PI * 2);
+        ctx.arc(size / 2, size / 2, 7, 0, Math.PI * 2);
         ctx.closePath();
         ctx.clip();
-        ctx.drawImage(logoImage, 1, 1, size - 2, size - 2);
+        ctx.drawImage(logoImage, 2, 2, size - 4, size - 4);
         ctx.restore();
     } else {
         ctx.fillStyle = textColor;
@@ -179,8 +179,8 @@ function createDatasets(data) {
             borderColor: lineColor,
             pointBackgroundColor: pointColor,
             pointBorderColor: pointColor,
-            pointRadius: (context) => (context.dataIndex === highlightIndex ? 13 : 7),
-            pointHoverRadius: (context) => (context.dataIndex === highlightIndex ? 15 : 10),
+            pointRadius: (context) => (context.dataIndex === highlightIndex ? 14 : 8),
+            pointHoverRadius: (context) => (context.dataIndex === highlightIndex ? 16 : 11),
             pointBorderWidth: (context) => (context.dataIndex === highlightIndex ? 4 : 2),
             pointHitRadius: 14,
             pointStyle: pointIcon,
