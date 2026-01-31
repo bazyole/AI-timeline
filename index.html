@@ -368,6 +368,13 @@
                     <button class="control-btn" id="applyX">Appliquer</button>
                 </div>
                 <div class="control-group">
+                    <span class="control-label">Période</span>
+                    <button class="control-btn" data-range="365">1Y</button>
+                    <button class="control-btn" data-range="730">2Y</button>
+                    <button class="control-btn" data-range="1825">5Y</button>
+                    <button class="control-btn" data-range="beginning">Beginning</button>
+                </div>
+                <div class="control-group">
                     <span class="control-label">Axe Y</span>
                     <input class="control-input" type="number" id="yMin" placeholder="min">
                     <input class="control-input" type="number" id="yMax" placeholder="max">
@@ -459,13 +466,13 @@
         ];
 
         const vendorColors = {
-            openai: "#10a37f",
+            openai: "#ffffff",
             anthropic: "#f97316",
             google: "#4285f4",
-            alibaba: "#ff6a00",
-            deepseek: "#7c3aed",
+            alibaba: "#8b5cf6",
+            deepseek: "#2563eb",
             meta: "#0866ff",
-            xai: "#9ca3af",
+            xai: "#374151",
             mistral: "#ef4444",
             zhipu: "#06b6d4",
             minimax: "#ec4899",
@@ -476,7 +483,7 @@
             openai: "OpenAI",
             anthropic: "Anthropic",
             google: "Google",
-            alibaba: "Alibaba",
+            alibaba: "Qwen",
             deepseek: "DeepSeek",
             meta: "Meta",
             xai: "xAI",
@@ -513,17 +520,20 @@
 
         let chart;
         let activeFilter = "all";
-        let hiddenVendors = new Set();
-        const defaultYMin = 600;
-        const defaultYMax = 1500;
+        let hiddenVendors = new Set(["zhipu", "minimax", "meta", "mistral"]);
+        const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const defaultYMin = 950;
+        const defaultYMax = 1450;
         const dateExtent = rawData.reduce((acc, item) => {
             const date = new Date(item.date);
             if (!acc.min || date < acc.min) acc.min = date;
             if (!acc.max || date > acc.max) acc.max = date;
             return acc;
         }, { min: null, max: null });
-        const defaultXMin = dateExtent.min;
-        const defaultXMax = dateExtent.max;
+        const defaultXMin = new Date(today.getTime() - 365 * ONE_DAY_MS);
+        const defaultXMax = new Date(today);
 
         function getFilteredData() {
             let data = rawData;
@@ -636,12 +646,36 @@
             return canvas;
         }
 
+        function getGoogleGradient(ctx, chartArea) {
+            if (!chartArea) {
+                return vendorColors.google;
+            }
+            const gradient = ctx.createLinearGradient(chartArea.left, chartArea.top, chartArea.right, chartArea.bottom);
+            gradient.addColorStop(0, "#4285f4");
+            gradient.addColorStop(0.33, "#34a853");
+            gradient.addColorStop(0.66, "#fbbc05");
+            gradient.addColorStop(1, "#ea4335");
+            return gradient;
+        }
+
         function createDatasets(data) {
             const vendors = vendorOrder.filter(vendor => data.some(d => d.vendor === vendor));
+            const vendorScores = new Map();
+            vendors.forEach(vendor => {
+                const vendorData = data
+                    .filter(d => d.vendor === vendor)
+                    .sort((a, b) => new Date(a.date) - new Date(b.date));
+                vendorScores.set(vendor, vendorData[vendorData.length - 1]?.score ?? 0);
+            });
+            const orderedByScore = [...vendors].sort((a, b) => vendorScores.get(a) - vendorScores.get(b));
+            const scoreOrderMap = new Map(orderedByScore.map((vendor, index) => [vendor, index]));
+
             return vendors.map(vendor => {
                 const vendorData = data
                     .filter(d => d.vendor === vendor)
                     .sort((a, b) => new Date(a.date) - new Date(b.date));
+                const highlightIndex = vendorData.length - 1;
+                const hasGradient = vendor === "google";
                 return {
                     label: vendorNames[vendor],
                     data: vendorData.map(d => ({
@@ -649,15 +683,27 @@
                         y: d.score,
                         model: d.model
                     })),
-                    backgroundColor: vendorColors[vendor],
-                    borderColor: vendorColors[vendor],
-                    pointRadius: 9,
-                    pointHoverRadius: 11,
+                    backgroundColor: hasGradient
+                        ? (context) => getGoogleGradient(context.chart.ctx, context.chart.chartArea)
+                        : vendorColors[vendor],
+                    borderColor: hasGradient
+                        ? (context) => getGoogleGradient(context.chart.ctx, context.chart.chartArea)
+                        : vendorColors[vendor],
+                    pointBackgroundColor: hasGradient
+                        ? (context) => getGoogleGradient(context.chart.ctx, context.chart.chartArea)
+                        : vendorColors[vendor],
+                    pointBorderColor: hasGradient
+                        ? (context) => getGoogleGradient(context.chart.ctx, context.chart.chartArea)
+                        : vendorColors[vendor],
+                    pointRadius: (context) => (context.dataIndex === highlightIndex ? 12 : 9),
+                    pointHoverRadius: (context) => (context.dataIndex === highlightIndex ? 14 : 11),
+                    pointBorderWidth: (context) => (context.dataIndex === highlightIndex ? 3 : 2),
                     pointHitRadius: 14,
                     pointStyle: createVendorIcon(vendor, vendorColors[vendor]),
                     showLine: true,
                     borderWidth: 2,
-                    tension: 0.2
+                    tension: 0.2,
+                    order: scoreOrderMap.get(vendor)
                 };
             });
         }
@@ -703,16 +749,20 @@
             updateStats(data);
         }
 
-        function setAxisInputs() {
+        function formatDateInput(date) {
+            return date.toISOString().slice(0, 10);
+        }
+
+        function setAxisInputs(xMin = defaultXMin, xMax = defaultXMax, yMin = defaultYMin, yMax = defaultYMax) {
             const xMinInput = document.getElementById('xMin');
             const xMaxInput = document.getElementById('xMax');
             const yMinInput = document.getElementById('yMin');
             const yMaxInput = document.getElementById('yMax');
 
-            xMinInput.value = defaultXMin.toISOString().slice(0, 10);
-            xMaxInput.value = defaultXMax.toISOString().slice(0, 10);
-            yMinInput.value = defaultYMin;
-            yMaxInput.value = defaultYMax;
+            xMinInput.value = formatDateInput(xMin);
+            xMaxInput.value = formatDateInput(xMax);
+            yMinInput.value = yMin;
+            yMaxInput.value = yMax;
         }
 
         function applyAxisScale(axis) {
@@ -740,6 +790,49 @@
             setAxisInputs();
         }
 
+        function applyDateRange(days) {
+            const endDate = new Date(today);
+            let startDate;
+            if (days === 'beginning') {
+                startDate = dateExtent.min;
+                chart.options.scales.x.max = dateExtent.max;
+            } else {
+                const totalDays = Number(days);
+                startDate = new Date(today.getTime() - totalDays * ONE_DAY_MS);
+                chart.options.scales.x.max = endDate;
+            }
+            chart.options.scales.x.min = startDate;
+            chart.options.scales.y.min = defaultYMin;
+            chart.options.scales.y.max = defaultYMax;
+            setAxisInputs(startDate, chart.options.scales.x.max, defaultYMin, defaultYMax);
+            chart.update('none');
+        }
+
+        const modelLabelPlugin = {
+            id: 'modelLabels',
+            afterDatasetsDraw(chartInstance) {
+                const { ctx } = chartInstance;
+                ctx.save();
+                ctx.font = '500 9px "IBM Plex Mono", monospace';
+                ctx.fillStyle = 'rgba(245, 245, 245, 0.7)';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+
+                chartInstance.data.datasets.forEach((dataset, datasetIndex) => {
+                    const meta = chartInstance.getDatasetMeta(datasetIndex);
+                    if (meta.hidden) return;
+                    meta.data.forEach((element, index) => {
+                        const pointData = dataset.data[index];
+                        if (!pointData || !pointData.model) return;
+                        const position = element.tooltipPosition();
+                        ctx.fillText(pointData.model, position.x + 8, position.y - 8);
+                    });
+                });
+
+                ctx.restore();
+            }
+        };
+
         function initChart() {
             const ctx = document.getElementById('mainChart').getContext('2d');
             const data = getFilteredData();
@@ -756,6 +849,7 @@
                     },
                     plugins: {
                         legend: { display: false },
+                        modelLabels: {},
                         zoom: {
                             pan: {
                                 enabled: true,
@@ -851,7 +945,8 @@
                         duration: 800,
                         easing: 'easeOutQuart'
                     }
-                }
+                },
+                plugins: [modelLabelPlugin]
             });
             
             updateStats(data);
@@ -876,6 +971,9 @@
             chart.resetZoom();
             resetAxes();
             chart.update('none');
+        });
+        document.querySelectorAll('[data-range]').forEach(btn => {
+            btn.addEventListener('click', () => applyDateRange(btn.dataset.range));
         });
 
         initChart();
