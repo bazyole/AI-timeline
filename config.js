@@ -39,6 +39,7 @@ const rawData = [
     { model: "GPT-5.1", date: "2025-11-12", score: 1413, vendor: "openai" },
     { model: "Claude Opus 4.5", date: "2025-11-15", score: 1431, vendor: "anthropic" },
     { model: "Gemini 3 Pro", date: "2025-11-18", score: 1395, vendor: "google" },
+    { model: "Grok 4.1 Fast", date: "2025-11-18", score: 1246, vendor: "xai" },
     { model: "DeepSeek-V3.2", date: "2025-12-01", score: 1259, vendor: "deepseek" },
     { model: "GPT-5.2", date: "2025-12-11", score: 1368, vendor: "openai" },
     { model: "GLM-4.7", date: "2025-12-22", score: 1196, vendor: "zhipu" },
