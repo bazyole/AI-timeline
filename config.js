@@ -30,7 +30,7 @@ const rawData = [
     { model: "GLM-4.5", date: "2025-07-28", score: 1114, vendor: "zhipu" },
     { model: "GPT-5", date: "2025-08-07", score: 1216, vendor: "openai" },
     { model: "DeepSeek-V3.1", date: "2025-08-21", score: 1100, vendor: "deepseek" },
-    { model: "Qwen3-Max", date: "2025-09-15", score: 1242, vendor: "alibaba" },
+    { model: "Qwen3 Next 80B", date: "2025-09-11", score: 1226, vendor: "alibaba" },
     { model: "Claude Sonnet 4.5", date: "2025-09-15", score: 1326, vendor: "anthropic" },
     { model: "GLM-4.6", date: "2025-09-15", score: 1243, vendor: "zhipu" },
     { model: "DeepSeek-V3.2-Exp", date: "2025-09-29", score: 1154, vendor: "deepseek" },
